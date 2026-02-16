@@ -3,13 +3,14 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Aaron's First Steps (Final v5.1)</title>
+    <title>Aaron's First Steps (Mobile Fix v5.2)</title>
     <style>
         body {
             margin: 0; padding: 0; overflow: hidden;
             background-color: #fdf6e3;
             font-family: 'Comic Sans MS', 'Chalkboard SE', sans-serif;
-            touch-action: none; user-select: none; -webkit-user-select: none;
+            touch-action: none; /* Bloqueia zoom e arrastar */
+            user-select: none; -webkit-user-select: none;
         }
         canvas { display: block; }
         
@@ -18,6 +19,7 @@
             pointer-events: none;
             display: flex; flex-direction: column; justify-content: space-between;
             padding: 15px; box-sizing: border-box;
+            z-index: 5;
         }
         
         .top-hud {
@@ -35,14 +37,16 @@
             transition: opacity 0.2s;
         }
 
+        /* MENU COM Z-INDEX ALTO PARA GARANTIR O CLIQUE NO CELULAR */
         #start-screen, #game-over-screen {
             position: absolute; top: 0; left: 0; width: 100%; height: 100%;
             background: rgba(255, 255, 255, 0.96);
             display: flex; flex-direction: column; align-items: center; justify-content: center;
-            pointer-events: auto; text-align: center; z-index: 10;
+            pointer-events: auto; text-align: center; 
+            z-index: 999; /* Garante que fique acima de tudo */
         }
         
-        .btn-group { display: flex; flex-direction: column; gap: 10px; margin-top: 20px; }
+        .btn-group { display: flex; flex-direction: column; gap: 15px; margin-top: 20px; }
         
         button {
             border: none; padding: 15px 40px;
@@ -50,7 +54,10 @@
             border-radius: 50px; cursor: pointer;
             box-shadow: 0 4px 0 rgba(0,0,0,0.2);
             transition: transform 0.1s; font-family: inherit;
-            min-width: 200px;
+            min-width: 220px;
+            /* Propriedades para melhorar o toque */
+            touch-action: manipulation;
+            -webkit-tap-highlight-color: transparent;
         }
         button:active { transform: translateY(4px); box-shadow: none; }
 
@@ -65,6 +72,7 @@
             display: flex; justify-content: space-between;
             padding: 0 20px; box-sizing: border-box;
             pointer-events: none; opacity: 0.6;
+            z-index: 50;
         }
         .control-arrow {
             font-size: 50px; color: #888;
@@ -77,6 +85,7 @@
 </head>
 <body>
 
+    <!-- HUD -->
     <div id="ui-layer" class="hidden">
         <div class="top-hud">
             <div class="score-box">Distância: <span id="score">0</span>m</div>
@@ -93,84 +102,63 @@
         </div>
     </div>
 
+    <!-- MENU INICIAL (Com correção de toque) -->
     <div id="start-screen">
         <h1 style="color:#81d4fa; font-size: 40px; margin: 0;">Aaron's First Steps</h1>
         <img id="menu-avatar" style="width:100px; height:100px; margin: 10px;">
         <p style="color:#666; font-size: 16px;">Escolha a dificuldade:</p>
         
         <div class="btn-group">
-            <button class="btn-easy" onclick="startGame('easy')">Fácil</button>
-            <button class="btn-normal" onclick="startGame('normal')">Normal</button>
-            <button class="btn-hard" onclick="startGame('hard')">Difícil</button>
+            <!-- ontouchend adicionado para garantir resposta imediata no celular -->
+            <button class="btn-easy" onclick="startGame('easy')" ontouchend="startGame('easy')">Fácil</button>
+            <button class="btn-normal" onclick="startGame('normal')" ontouchend="startGame('normal')">Normal</button>
+            <button class="btn-hard" onclick="startGame('hard')" ontouchend="startGame('hard')">Difícil</button>
         </div>
     </div>
 
+    <!-- GAME OVER -->
     <div id="game-over-screen" class="hidden">
         <h1 style="color:#555;" id="game-over-title">Caiu!</h1>
         <p id="final-score" style="font-size: 28px; font-weight:bold; color: #5d5d5d;">0 metros</p>
-        <button class="btn-easy" onclick="location.reload()">Voltar ao Menu</button>
+        <button class="btn-easy" onclick="location.reload()" ontouchend="location.reload()">Voltar ao Menu</button>
     </div>
 
     <canvas id="gameCanvas"></canvas>
 
 <script>
 /**
- * AARON'S FIRST STEPS - VERSÃO FINAL V5.1
- * - Aaron: 2 Olhos detalhados (estilo cute), sem braços, sem coração.
- * - Física Zen em TODOS os modos.
+ * AARON'S FIRST STEPS - VERSÃO V5.2 (MOBILE FIX + OLHOS FOFOS)
+ * - Correção crítica de botões para mobile (ontouchend).
+ * - Aaron com olhos fofos.
+ * - Física Zen em todos os modos.
  */
 
-// --- 1. CONFIGURAÇÕES DE DIFICULDADE ---
+// --- 1. CONFIGURAÇÕES ---
 const LEVELS = {
     easy: {
-        lives: 3,
-        spawnRate: 180,      
-        correction: 1.5,
-        fallForce: 0.015,
-        magnetTime: 120      // Fácil mantém 2s (120 frames) de estabilidade
+        lives: 3, spawnRate: 180, correction: 1.5, fallForce: 0.015, magnetTime: 120      
     },
     normal: {
-        lives: 3,
-        spawnRate: 140,      
-        correction: 1.5,     
-        fallForce: 0.03,     
-        magnetTime: 30       // Normal tem apenas 0.5s (30 frames)
+        lives: 3, spawnRate: 140, correction: 1.5, fallForce: 0.03, magnetTime: 30       
     },
     hard: {
-        lives: 1,            
-        spawnRate: 70,       
-        correction: 1.5,
-        fallForce: 0.04,     
-        magnetTime: 30       
+        lives: 1, spawnRate: 70, correction: 1.5, fallForce: 0.06, magnetTime: 30       
     }
 };
 
 let CURRENT_LEVEL = LEVELS.easy; 
+let gameRunning = false; // Flag para evitar duplo clique (Click + Touch)
 
 const STATE = {
-    isPlaying: false,
-    score: 0,
-    frames: 0,
-    lives: 3,
-    aaronX: 0,
-    angle: 0,
-    forceDirection: 1,  
-    stabilityTimer: 0,  
-    isInvincible: false
+    isPlaying: false, score: 0, frames: 0, lives: 3,
+    aaronX: 0, angle: 0, forceDirection: 1, stabilityTimer: 0, isInvincible: false
 };
 
-// --- 2. SPRITES VETORIAIS (Aaron Atualizado com Olhos Fofos) ---
+// --- 2. SPRITES VETORIAIS (Aaron Fofo) ---
 const SVG_SPRITES = {
-    // Aaron: 2 Olhos ovais com brilho
     aaron: `data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMDAgMTAwIj48cGF0aCBkPSJNMzUgODAgQzM1IDkwIDQ1IDk1IDQ1IDg1IiBzdHJva2U9IiNmZmNjYWEiIHN0cm9rZS13aWR0aD0iOCIgZmlsbD0ibm9uZSIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIi8+PHBhdGggZD0iTTY1IDgwIEM2NSA5MCA1NSA5NSA1NSA4NSIgc3Ryb2tlPSIjZmZjY2FhIiBzdHJva2Utd2lkdGg9IjgiIGZpbGw9Im5vbmUiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIvPjxyZWN0IHg9IjI1IiB5PSI1MCIgd2lkdGg9IjUwIiBoZWlnaHQ9IjQwIiByeD0iMTUiIGZpbGw9IiM4MWQ0ZmEiIHN0cm9rZT0iIzQ1N2I5ZCIgc3Ryb2tlLXdpZHRoPSIyIi8+PGNpcmNsZSBjeD0iNTAiIGN5PSIzNSIgcj0iMjgiIGZpbGw9IiNmZmNjYWEiIHN0cm9rZT0iIzU1NSIgc3Ryb2tlLXdpZHRoPSIyIi8+PGVsbGlwc2UgY3g9IjQwIiBjeT0iMzMiIHJ4PSIzLjUiIHJ5PSI1IiBmaWxsPSIjMzMzIi8+PGVsbGlwc2UgY3g9IjYwIiBjeT0iMzMiIHJ4PSIzLjUiIHJ5PSI1IiBmaWxsPSIjMzMzIi8+PGNpcmNsZSBjeD0iMzkiIGN5PSIzMSIgcj0iMS41IiBmaWxsPSJ3aGl0ZSIvPjxjaXJjbGUgY3g9IjU5IiBjeT0iMzEiIHI9IjEuNSIgZmlsbD0id2hpdGUiLz48cGF0aCBkPSJNNDcgNDMgUTUwIDQ2IDUzIDQzIiBmaWxsPSJub25lIiBzdHJva2U9IiMzMzMiIHN0cm9rZS13aWR0aD0iMiIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIi8+PC9zdmc+`,
-    
-    // Coração HUD
     heart: `data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA0MCA0MCI+PHBhdGggZD0iTTIwIDM1IEMyMCAzNSAzNSAyNSAzNSAxNSBDMzUgNSAyNSA1IDIwIDEyIEMxNSA1IDUgNSA1IDE1IEM1IDI1IDIwIDM1IDIwIDM1IiBmaWxsPSIjZmY1YzhkIiBzdHJva2U9IiMzMzMiIHN0cm9rZS13aWR0aD0iMiIvPjwvc3ZnPg==`,
-    
-    // Bola
     ball: `data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA0MCA0MCI+PGNpcmNsZSBjeD0iMjAiIGN5PSIyMCIgcj0iMTgiIGZpbGw9IiNmZjk4MDAiIHN0cm9rZT0iIzMzMyIgc3Ryb2tlLXdpZHRoPSIyIi8+PHBhdGggZD0iTTIwIDIgQzIwIDIgMzAgMTAgMzAgMjAgQzMwIDMwIDIwIDM4IDIwIDM4IiBmaWxsPSJub25lIiBzdHJva2U9IiMzMzMiIHN0cm9rZS13aWR0aD0iMiIvPjxwYXRoIGQ0PSJNMiAyMCBDMiAyMCAxMCAzMCAyMCAzMCBDMzAgMzAgMzggMjAgMzggMjAiIGZpbGw9Im5vbmUiIHN0cm9rZT0iIzMzMyIgc3Ryb2tlLXdpZHRoPSIyIi8+PC9zdmc+`,
-    
-    // Urso
     bear: `data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2MCA2MCI+PGNpcmNsZSBjeD0iMTUiIGN5PSIxNSIgcj0iOCIgZmlsbD0iIzhkNmU2MyIgc3Ryb2tlPSIjM2QyNzIwIiBzdHJva2Utd2lkdGg9IjIiLz48Y2lyY2xlIGN4PSI0NSIgY3k9IjE1IiByPSI4IiBmaWxsPSIjOGQ2ZTYzIiBzdHJva2U9IiMzZDI3MjAiIHN0cm9rZS13aWR0aD0iMiIvPjxlbGxpcHNlIGN4PSIzMCIgY3k9IjQ1IiByeD0iMTgiIHJ5PSIxNCIgZmlsbD0iIzhkNmU2MyIgc3Ryb2tlPSIjM2QyNzIwIiBzdHJva2Utd2lkdGg9IjIiLz48Y2lyY2xlIGN4PSIzMCIgY3k9IjQ1IiByPSI4IiBmaWxsPSIjZDdjY2I4IiAvPjxjaXJjbGUgY3g9IjMwIiBjeT0iMjUiIHI9IjE2IiBmaWxsPSIjOGQ2ZTYzIiBzdHJva2U9IiMzZDI3MjAiIHN0cm9rZS13aWR0aD0iMiIvPjxlbGxpcHNlIGN4PSIzMCIgY3k9IjI4IiByeD0iNiIgcnk9IjUiIGZpbGw9IiNkN2NjYjgiIC8+PGNpcmNsZSBjeD0iMzAiIGN5PSIyNiIgcj0iMiIgZmlsbD0iIzNkMjcyMCIvPjxjaXJjbGUgY3g9IjI0IiBjeT0iMjIiIHI9IjEuNSIgZmlsbD0iIzMzMyIvPjxjaXJjbGUgY3g9IjM2IiBjeT0iMjIiIHI9IjEuNSIgZmlsbD0iIzMzMyIvPjwvc3ZnPg==`
 };
 
@@ -185,18 +173,28 @@ document.getElementById('life1').src = SVG_SPRITES.heart;
 document.getElementById('life2').src = SVG_SPRITES.heart;
 document.getElementById('life3').src = SVG_SPRITES.heart;
 
-// --- 3. ÁUDIO ---
+// --- 3. ÁUDIO SEGURO ---
 const AudioSys = {
     ctx: null,
-    init: function() { if (!this.ctx) this.ctx = new (window.AudioContext || window.webkitAudioContext)(); },
+    init: function() { 
+        try {
+            const AC = window.AudioContext || window.webkitAudioContext;
+            if (AC) this.ctx = new AC();
+        } catch(e) {}
+    },
     play: function(freq, type) {
         if (!this.ctx) return;
-        const o = this.ctx.createOscillator(); const g = this.ctx.createGain();
-        o.type = type; o.frequency.value = freq;
-        g.gain.value = 0.05;
-        g.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + 0.1);
-        o.connect(g); g.connect(this.ctx.destination);
-        o.start(); o.stop(this.ctx.currentTime + 0.1);
+        try {
+            // Reativa áudio se estiver suspenso pelo navegador mobile
+            if (this.ctx.state === 'suspended') this.ctx.resume();
+            
+            const o = this.ctx.createOscillator(); const g = this.ctx.createGain();
+            o.type = type; o.frequency.value = freq;
+            g.gain.value = 0.05;
+            g.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + 0.1);
+            o.connect(g); g.connect(this.ctx.destination);
+            o.start(); o.stop(this.ctx.currentTime + 0.1);
+        } catch(e) {}
     }
 };
 
@@ -220,11 +218,12 @@ const setInput = (k, v) => {
 };
 window.addEventListener('keydown', e => setInput(e.key, true));
 window.addEventListener('keyup', e => setInput(e.key, false));
-window.addEventListener('touchstart', e => {
+// Touch Global (Gameplay)
+canvas.addEventListener('touchstart', e => {
     e.preventDefault();
     if (e.touches[0].clientX < window.innerWidth/2) input.left = true; else input.right = true;
 }, {passive:false});
-window.addEventListener('touchend', e => { e.preventDefault(); input.left=false; input.right=false; });
+canvas.addEventListener('touchend', e => { e.preventDefault(); input.left=false; input.right=false; });
 
 function updatePhysics() {
     // 1. INPUT
@@ -239,36 +238,28 @@ function updatePhysics() {
     }
     STATE.aaronX = Math.max(40, Math.min(canvas.width - 40, STATE.aaronX));
 
-    // 2. LÓGICA ZEN (Para todos os modos)
+    // 2. LÓGICA ZEN
     if (correction !== 0) {
-        // Jogador corrigindo
         STATE.angle += correction;
-        
-        // Se alinhou perto do centro, ganha estabilidade
         if (Math.abs(STATE.angle) < 10) {
             STATE.stabilityTimer = CURRENT_LEVEL.magnetTime;
             STATE.forceDirection = Math.random() > 0.5 ? 1 : -1;
         }
     } else {
-        // Jogador soltou
         if (STATE.stabilityTimer > 0) {
-            // Estabilidade Magnética
             STATE.stabilityTimer--;
-            STATE.angle *= 0.92; // Puxa para o centro
+            STATE.angle *= 0.92; 
         } else {
-            // Queda (Sem física de pêndulo, apenas queda Zen progressiva)
             STATE.angle += (Math.abs(STATE.angle) * CURRENT_LEVEL.fallForce + 0.02) * STATE.forceDirection;
         }
     }
 
-    // Game Over
     if (Math.abs(STATE.angle) > 70) gameOver("Caiu no chão!");
 }
 
 function update() {
     updatePhysics();
 
-    // Obstáculos
     STATE.frames++;
     if (STATE.frames % 30 === 0 && STATE.isPlaying) AudioSys.play(200, 'sine'); 
 
@@ -341,7 +332,7 @@ function draw() {
     ctx.save();
     ctx.translate(STATE.aaronX, 160);
     
-    // Aura Verde (Mostra quando a estabilidade está ativa)
+    // Aura Verde
     if (STATE.stabilityTimer > 0) {
         ctx.fillStyle = "rgba(100, 255, 100, 0.2)";
         ctx.beginPath(); ctx.arc(0, 0, 50, 0, 7); ctx.fill();
@@ -363,12 +354,15 @@ function loop() {
     if(STATE.isPlaying) { update(); draw(); anim = requestAnimationFrame(loop); }
 }
 
+// --- FUNÇÃO START SEGURA PARA CELULAR ---
 function startGame(difficulty) {
+    if (gameRunning) return; // Evita duplo clique
+    
+    AudioSys.init(); // Ativa áudio no primeiro toque
+    
     document.getElementById('start-screen').classList.add('hidden');
     document.getElementById('game-over-screen').classList.add('hidden');
     document.getElementById('ui-layer').classList.remove('hidden');
-    
-    AudioSys.init();
     
     CURRENT_LEVEL = LEVELS[difficulty];
     STATE.lives = CURRENT_LEVEL.lives;
@@ -377,17 +371,20 @@ function startGame(difficulty) {
     STATE.angle = 0; 
     STATE.aaronX = canvas.width/2; 
     STATE.frames = 0;
-    // TODOS COMEÇAM COM 1 SEGUNDO DE ESTABILIDADE (60 frames)
-    STATE.stabilityTimer = 60; 
+    STATE.stabilityTimer = 60; // 1 segundo inicial
     STATE.isInvincible = false;
     obstacles = [];
     
     updateLivesUI();
-    STATE.isPlaying = true; loop();
+    STATE.isPlaying = true; 
+    gameRunning = true;
+    loop();
 }
 
 function gameOver(reason) {
-    STATE.isPlaying = false; cancelAnimationFrame(anim);
+    STATE.isPlaying = false; 
+    gameRunning = false;
+    cancelAnimationFrame(anim);
     AudioSys.play(100, 'square');
     document.getElementById('final-score').innerText = STATE.score + " metros";
     document.getElementById('game-over-title').innerText = reason;
